@@ -1,38 +1,58 @@
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
 
 entity pwm is
-    port (
-        clk        : in std_logic;
-        enable     : in std_logic;
-        freq_ctrl  : in integer;
-        pwm_out    : out std_logic
+    Port (
+        clk         : in  STD_LOGIC;         -- Reloj de 50 MHz
+        rst         : in  STD_LOGIC;         -- Reset síncrono
+        up_down     : in  STD_LOGIC;         -- '1' para aumentar, '0' para disminuir
+        change_freq : in  STD_LOGIC;         -- Pulso para cambiar frecuencia
+        out_freq    : out STD_LOGIC          -- Señal de salida con frecuencia ajustada
     );
-end entity;
+end pwm;
 
-architecture rtl of pwm is
-    signal counter    : integer := 0;
-    signal pwm_reg    : std_logic := '0';
-    constant clk_freq : integer := 50000000;
+architecture Behavioral of pwm is
+    constant CLK_FREQ     : integer := 50000000;  -- 50 MHz
+    constant MIN_FREQ     : integer := 1;         -- 1 Hz mínimo para evitar división por cero
+    constant MAX_FREQ     : integer := 10000;     -- 10 kHz máximo
+
+    signal freq_setting   : integer range MIN_FREQ to MAX_FREQ := 1000; -- Frecuencia inicial 1 kHz
+    signal counter        : integer := 0;
+    signal toggle         : STD_LOGIC := '0';
+    signal clk_divider    : integer := CLK_FREQ / (2 * freq_setting);
 begin
+
+    -- Frecuencia ajustable
     process(clk)
-        variable period : integer;
     begin
         if rising_edge(clk) then
-            if enable = '1' then
-                period := clk_freq / (freq_ctrl * 2);
-                if counter < period then
-                    counter <= counter + 15;
-                else
-                    counter <= 0;
-                    pwm_reg <= not pwm_reg;
+            if rst = '1' then
+                freq_setting <= 1000;
+            elsif change_freq = '1' then
+                if up_down = '1' and freq_setting < MAX_FREQ then
+                    freq_setting <= freq_setting + 1;
+                elsif up_down = '0' and freq_setting > MIN_FREQ then
+                    freq_setting <= freq_setting - 1;
                 end if;
-            else
-                counter <= 0;
-                pwm_reg <= '0';
             end if;
         end if;
     end process;
-    pwm_out <= pwm_reg;
-end rtl;
+
+    -- Señal de salida con frecuencia ajustada
+    process(clk)
+        variable clk_div_val : integer;
+    begin
+        if rising_edge(clk) then
+            clk_div_val := CLK_FREQ / (2 * freq_setting);
+            if counter >= clk_div_val then
+                counter <= 0;
+                toggle <= not toggle;
+            else
+                counter <= counter + 1;
+            end if;
+        end if;
+    end process;
+
+    out_freq <= toggle;
+end Behavioral;
