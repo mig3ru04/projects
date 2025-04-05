@@ -2,44 +2,61 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
-entity pwm is
+entity freq_control_buttons is
     Port (
-        clk         : in  STD_LOGIC;         -- Reloj de 50 MHz
-        rst         : in  STD_LOGIC;         -- Reset síncrono
-        up_down     : in  STD_LOGIC;         -- '1' para aumentar, '0' para disminuir
-        change_freq : in  STD_LOGIC;         -- Pulso para cambiar frecuencia
-        out_freq    : out STD_LOGIC          -- Señal de salida con frecuencia ajustada
+        clk       : in  STD_LOGIC;     -- Reloj de 50 MHz
+        rst       : in  STD_LOGIC;     -- Reset síncrono
+        btn_up    : in  STD_LOGIC;     -- Botón para subir frecuencia
+        btn_down  : in  STD_LOGIC;     -- Botón para bajar frecuencia
+        out_freq  : out STD_LOGIC      -- Señal de salida con frecuencia ajustada
     );
-end pwm;
+end freq_control_buttons;
 
-architecture Behavioral of pwm is
-    constant CLK_FREQ     : integer := 50000000;  -- 50 MHz
-    constant MIN_FREQ     : integer := 1;         -- 1 Hz mínimo para evitar división por cero
-    constant MAX_FREQ     : integer := 10000;     -- 10 kHz máximo
+architecture Behavioral of freq_control_buttons is
+    constant CLK_FREQ  : integer := 50000000;
+    constant MIN_FREQ  : integer := 1;       -- 1 Hz mínimo
+    constant MAX_FREQ  : integer := 10000;   -- 10 kHz máximo
 
-    signal freq_setting   : integer range MIN_FREQ to MAX_FREQ := 1000; -- Frecuencia inicial 1 kHz
-    signal counter        : integer := 0;
-    signal toggle         : STD_LOGIC := '0';
-    signal clk_divider    : integer := CLK_FREQ / (2 * freq_setting);
+    signal freq_setting : integer range MIN_FREQ to MAX_FREQ := 1000;  -- Valor inicial: 1 kHz
+    signal counter      : integer := 0;
+    signal toggle       : STD_LOGIC := '0';
+
+    signal prev_up      : STD_LOGIC := '0';
+    signal prev_down    : STD_LOGIC := '0';
+
 begin
 
-    -- Frecuencia ajustable
+    -- Procesamiento de botones: flancos de subida
     process(clk)
     begin
         if rising_edge(clk) then
             if rst = '1' then
                 freq_setting <= 1000;
-            elsif change_freq = '1' then
-                if up_down = '1' and freq_setting < MAX_FREQ then
-                    freq_setting <= freq_setting + 1;
-                elsif up_down = '0' and freq_setting > MIN_FREQ then
-                    freq_setting <= freq_setting - 1;
+                prev_up <= '0';
+                prev_down <= '0';
+            else
+                -- Detectar flanco de subida de btn_up
+                if btn_up = '1' and prev_up = '0' then
+                    if freq_setting < MAX_FREQ then
+                        freq_setting <= freq_setting + 1;
+                    end if;
                 end if;
+
+                -- Detectar flanco de subida de btn_down
+                if btn_down = '1' and prev_down = '0' then
+                    if freq_setting > MIN_FREQ then
+                        freq_setting <= freq_setting - 1;
+                    end if;
+                end if;
+
+                -- Guardar estados anteriores de botones
+                prev_up <= btn_up;
+                prev_down <= btn_down;
             end if;
         end if;
     end process;
 
-    -- Señal de salida con frecuencia ajustada
+    -- Generador de señal con frecuencia ajustada
     process(clk)
         variable clk_div_val : integer;
     begin
