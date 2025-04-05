@@ -1,0 +1,38 @@
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity pwm is
+    port (
+        clk        : in std_logic;
+        enable     : in std_logic;
+        freq_ctrl  : in integer;
+        pwm_out    : out std_logic
+    );
+end entity;
+
+architecture rtl of pwm is
+    signal counter    : integer := 0;
+    signal pwm_reg    : std_logic := '0';
+    constant clk_freq : integer := 50000000;
+begin
+    process(clk)
+        variable period : integer;
+    begin
+        if rising_edge(clk) then
+            if enable = '1' then
+                period := clk_freq / (freq_ctrl * 2);
+                if counter < period then
+                    counter <= counter + 15;
+                else
+                    counter <= 0;
+                    pwm_reg <= not pwm_reg;
+                end if;
+            else
+                counter <= 0;
+                pwm_reg <= '0';
+            end if;
+        end if;
+    end process;
+    pwm_out <= pwm_reg;
+end rtl;
